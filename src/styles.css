@@ -55,7 +55,8 @@
 .tab:hover{background:#16161B;color:var(--tx)}
 .tab.on{background:var(--ac);color:#14100A;font-weight:600}
 
-.body{display:grid;grid-template-columns:1fr 392px;min-height:660px;border-bottom:1px solid var(--line)}
+.body{display:grid;grid-template-columns:1fr 392px;border-bottom:1px solid var(--line)}
+.body.solo{grid-template-columns:1fr}
 .stage{border-right:1px solid var(--line);position:relative;min-width:0;overflow:hidden;background:#08080A}
 .panel{padding:24px 24px 34px;overflow-y:auto;max-height:84vh;background:var(--sf)}
 .pad{padding:26px 28px 34px;max-height:84vh;overflow-y:auto}
@@ -455,6 +456,20 @@
   letter-spacing:.22em;text-anchor:middle;pointer-events:none;opacity:.9;
   paint-order:stroke;stroke:#08080A;stroke-width:3.5px;stroke-linejoin:round}
 
+/* ---- v25: 地図の高さ抑制・中央寄せ・パネル開閉 ---- */
+.stage{display:flex;justify-content:center;align-items:stretch}
+.mapwrap{width:100%;max-width:1180px;min-height:0;
+  height:clamp(330px,calc(100vh - 330px),520px)}
+.body.solo .mapwrap{max-width:1320px}
+.panel{position:relative;max-height:clamp(330px,calc(100vh - 330px),520px)}
+.panel-x{position:sticky;top:0;float:right;background:#16161B;border:1px solid var(--line2);
+  color:var(--tx2);font-size:11px;padding:4px 10px;letter-spacing:.08em;margin:-6px -6px 6px 8px;z-index:2}
+.panel-x:hover{color:var(--tx);border-color:#5A5A66}
+.seg-note{font-size:11px;color:var(--mu);line-height:1.7}
+.agebox{padding-top:26px;margin-top:26px;border-top:1px solid var(--line)}
+.age-h{font-family:var(--mincho);font-weight:400;font-size:18px;letter-spacing:.08em;margin:0 0 10px;color:var(--tx)}
+.age-lead{font-size:12.5px;line-height:2;color:var(--tx2);max-width:760px;margin:0 0 18px}
+
 @media (max-width:1080px){
   .body{grid-template-columns:1fr}
   .steps,.prefcards{grid-template-columns:1fr 1fr}
@@ -500,8 +515,8 @@
   .sliders{flex:1;width:auto}
   .tabs{margin-left:0;width:100%;overflow-x:auto}
   .tab{flex:1;justify-content:center;padding:9px 8px}
-  .mapwrap{min-height:auto}
-  .map{min-height:58vh}
+  .mapwrap{height:clamp(320px,62vh,560px);max-width:none}
+  .panel{max-height:none}
   .mapbar{padding:8px 10px;gap:8px}
   .legend{padding:9px 10px}
   .mapbar{left:10px;right:10px;top:10px;justify-content:space-between;padding:6px 8px;flex-wrap:wrap;gap:6px}

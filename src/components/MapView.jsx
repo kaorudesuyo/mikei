@@ -3,11 +3,11 @@ import { BLOCKS, PREFS } from "../data/blocks.js";
 import { P } from "../data/projects.js";
 import { USE } from "../data/certSystems.js";
 import { LON0, LON1, LAT0, LAT1, MW, MH, bx, by, PX_PER_KM, COAST, BORDERS, RAILS, RAIL_LINES, METRO_LINES, MUNI, STATIONS, GEO_LABELS } from "../data/geo.js";
-import { blockOf, clamp, hasAnyCert, popIdx50, tick, dotR } from "../lib/utils.js";
+import { blockOf, clamp, hasAnyCert, popIdx50, tick, dotR, fmt } from "../lib/utils.js";
 import { CertGlyph, IconPin, IconUsers, IconLayer, IconChevD, IconBldg, IconPlus, IconMinus, IconReset } from "./icons.jsx";
 
 /* ============================ 地図 ============================ */
-function MapView({data,byBlock,sel,setSel,blockSel,setBlockSel,prefs,scopeLabel}){
+function MapView({data,byBlock,sel,setSel,blockSel,setBlockSel,prefs,scopeLabel,tokyoScope}){
   const wrapRef=useRef(null);
   const [tip,setTip]=useState(null);
   const [layers,setLayers]=useState({pins:true,pop:false});
@@ -39,7 +39,8 @@ function MapView({data,byBlock,sel,setSel,blockSel,setBlockSel,prefs,scopeLabel}
        ・1都3県すべて … 全域だと余白が多いので、案件密度の高い側に重心を寄せ、
                         5〜95パーセンタイルでトリムした範囲にフィットする
        fitTickは「表示リセット」で同じターゲットへ再フィットさせるための番号 */
-    const scoped=blockSel?[blockOf(blockSel)]:BLOCKS.filter(b=>prefs.includes(b.pref));
+    const inScope=(b)=>prefs.includes(b.pref)&&!(b.pref==="東京都"&&tokyoScope==="ku23"&&!b.ku23);
+    const scoped=blockSel?[blockOf(blockSel)]:BLOCKS.filter(inScope);
     const all=prefs.length>=PREFS.length&&!blockSel;
     const pts=[];
     const push=(lon,lat)=>pts.push([bx(lon),by(lat)]);
@@ -68,7 +69,7 @@ function MapView({data,byBlock,sel,setSel,blockSel,setBlockSel,prefs,scopeLabel}
       cx=cx*0.45+gx*0.55; cy=cy*0.45+gy*0.55;
     }
     return {cx,cy,k,tick:fitTick};
-  },[blockSel,prefs,fitTick]);
+  },[blockSel,prefs,fitTick,tokyoScope]);
 
   const [vp,setVp]=useState(target);
   const vpRef=useRef(vp); vpRef.current=vp;
@@ -117,12 +118,19 @@ function MapView({data,byBlock,sel,setSel,blockSel,setBlockSel,prefs,scopeLabel}
   const drag=useRef(null);
   const pinch=useRef(null);
   const ptrs=useRef(new Map());
+  const hitRef=useRef(null);
   const movedRef=useRef(false);
   const onPointerDown=(e)=>{
     if(e.pointerType==="mouse"&&e.button!==0)return;
     /* ホイールの確定待ちが残っていたら先に確定してから新ジェスチャーへ */
     if(wheelTimer.current){clearTimeout(wheelTimer.current);wheelTimer.current=0;commitGesture();}
     ptrs.current.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    /* ポインターキャプチャは後続のclickを地図divへリターゲットしてしまうため、
+       選択は「押した対象」を覚えて pointerup で確定する方式にしている */
+    if(ptrs.current.size===1){
+      const t=e.target&&e.target.closest?e.target.closest("[data-pid],[data-bid]"):null;
+      hitRef.current=t?{pid:t.getAttribute("data-pid"),bid:t.getAttribute("data-bid")}:null;
+    }else{hitRef.current=null;}
     try{e.currentTarget.setPointerCapture?.(e.pointerId);}catch(_){/* no-op */}
     if(ptrs.current.size>=2){
       const ids=[...ptrs.current.keys()].slice(-2);
@@ -185,6 +193,11 @@ function MapView({data,byBlock,sel,setSel,blockSel,setBlockSel,prefs,scopeLabel}
     }else if(ptrs.current.size===0){
       drag.current=null;
       commitGesture();   /* 全指が離れた瞬間に確定し、LOD・文字を新倍率で再計算 */
+      const hit=hitRef.current; hitRef.current=null;
+      if(hit&&!movedRef.current){
+        if(hit.pid)setSel(hit.pid);
+        else if(hit.bid)setBlockSel(hit.bid);
+      }
     }
   };
   const wasDrag=()=>movedRef.current;
@@ -367,7 +380,7 @@ function MapView({data,byBlock,sel,setSel,blockSel,setBlockSel,prefs,scopeLabel}
             const items=byBlock[b.id]||[];if(!items.length)return null;
             const gfa=items.reduce((s,p)=>s+(p.gfa||0),0);
             const r=(15+Math.min(34,Math.sqrt(gfa)/112)+items.length*1.1)*Math.min(ts,1.6);
-            return (<g key={b.id} className="blk" onClick={()=>{if(wasDrag())return;setBlockSel(b.id);}}>
+            return (<g key={b.id} className="blk" data-bid={b.id}>
               <circle cx={X(b.ll[0])} cy={Y(b.ll[1])} r={r+3.5} className="blk-halo"/>
               <circle cx={X(b.ll[0])} cy={Y(b.ll[1])} r={r} className="blk-c"/>
               <text x={X(b.ll[0])} y={Y(b.ll[1])+1.5} className="blk-n">{items.length}</text>
@@ -383,8 +396,7 @@ function MapView({data,byBlock,sel,setSel,blockSel,setBlockSel,prefs,scopeLabel}
             if(x<-40||x>MW+40||y<-60||y>MH+40)return null;
             const t=tick(p.h),r=dotR(p.gfa),c=USE[p.use].c;
             const on=sel===p.id;
-            return (<g key={p.id} className={"pin "+p.st+(on?" sel":"")}
-              onClick={()=>{if(wasDrag())return;setSel(p.id);}}
+            return (<g key={p.id} className={"pin "+p.st+(on?" sel":"")} data-pid={p.id}
               onMouseEnter={e=>show(e,p)} onMouseMove={e=>show(e,p)} onMouseLeave={()=>setTip(null)}>
               <line x1={x} y1={y} x2={x} y2={y-t} stroke={c} className="stem"/>
               {hasAnyCert(p)&&<circle cx={x} cy={y-t-5*msf} r={2.8*msf} className="certdot"/>}
@@ -411,7 +423,7 @@ function MapView({data,byBlock,sel,setSel,blockSel,setBlockSel,prefs,scopeLabel}
       {tip&&(<div className="tip" style={{left:Math.min(tip.x+16,640),top:Math.max(tip.y-10,8)}}>
         <div className="tip-n">{tip.p.n}</div>
         <div className="tip-dev"><IconBldg width={11} height={11}/>{(tip.p.devs||[]).join("・")}</div>
-        <div className="tip-m">{blockOf(tip.p.blk).short}　/　{tip.p.yl}{tip.p.h?`　/　${tip.p.h}m`:""}</div>
+        <div className="tip-m">{blockOf(tip.p.blk).short}　/　{tip.p.yl}　/　延床 {tip.p.gfa?`${fmt(tip.p.gfa)} ㎡`:"—"}</div>
         {tip.p.cert?.length>0&&<div className="tip-c">
           {tip.p.cert.slice(0,4).map((c,i)=><span key={i}><CertGlyph sys={c.sys} size={13}/>{c.sys}{c.rank!=="—"?` ${c.rank}`:""}</span>)}
         </div>}

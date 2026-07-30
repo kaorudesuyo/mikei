@@ -3,14 +3,14 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, BarChart, Bar, Legend, ReferenceLine
 } from "recharts";
-import { PREFS, BLOCKS, POP_YEARS } from "./data/blocks.js";
+import { PREFS, BLOCKS, POP_YEARS, AGE_NATION, AGE_PREF } from "./data/blocks.js";
 import { USE, STATUS } from "./data/certSystems.js";
 import { P } from "./data/projects.js";
 import { S } from "./data/sources.js";
 import { AREA_CERTS } from "./data/areaCerts.js";
 import { blockOf, fmt, TT, hasAnyCert } from "./lib/utils.js";
 import { CertGlyph, IconMap, IconTime, IconStock, IconCert, IconList, IconPop, IconSearch, IconLink, IconChevD, IconReset, IconClose, IconLayer, MikeiMark } from "./components/icons.jsx";
-import { Label, Stat, Read } from "./components/ui.jsx";
+import { Label, Stat, Read, A } from "./components/ui.jsx";
 import { MapView } from "./components/MapView.jsx";
 import { DetailDrawer } from "./components/DetailDrawer.jsx";
 import { TimelineView, StockView, CertView, ListView } from "./components/views.jsx";
@@ -53,6 +53,8 @@ export default function App(){
   const [nav,setNav]=useState("home");            /* home | map | insight | list */
   const [insTab,setInsTab]=useState("timeline");  /* timeline | stock | cert | pop */
   const [filterOpen,setFilterOpen]=useState(false);
+  const [guideOpen,setGuideOpen]=useState(false);   /* 読み方／ブロック情報パネル */
+  const [tokyoScope,setTokyoScope]=useState("all"); /* all=東京都（全域）／ku23=東京都（23区） */
 
   const [prefs,setPrefs]=useState(PREFS.map(p=>p.name));
   const [blockSel,setBlockSel]=useState(null);
@@ -67,6 +69,7 @@ export default function App(){
   const filtered=useMemo(()=>P.filter(p=>{
     const b=blockOf(p.blk);
     if(!prefs.includes(b.pref))return false;
+    if(b.pref==="東京都"&&tokyoScope==="ku23"&&!b.ku23)return false;
     if(blockSel&&p.blk!==blockSel)return false;
     if(p.y<range[0]||p.y>range[1])return false;
     if(!uses.includes(p.use))return false;
@@ -74,7 +77,7 @@ export default function App(){
     if(q){const s=(p.n+p.own+p.des+p.con+p.mix+(p.devs||[]).join(" ")+b.name).toLowerCase();
       if(!s.includes(q.toLowerCase()))return false;}
     return true;
-  }),[prefs,blockSel,range,uses,sts,q]);
+  }),[prefs,blockSel,range,uses,sts,q,tokyoScope]);
 
   const byBlock=useMemo(()=>{const m={};filtered.forEach(p=>{(m[p.blk] ||= []).push(p);});return m;},[filtered]);
   const totalGfa=filtered.reduce((s,p)=>s+(p.gfa||0),0);
@@ -89,19 +92,22 @@ export default function App(){
 
   const selP=sel?P.find(p=>p.id===sel):null;
   const selB=blockSel?blockOf(blockSel):null;
-  const scopeLabel=blockSel?`${selB.pref}／${selB.name}`:prefs.length===4?"1都3県 全域":prefs.join("・");
+  const tkLabel=tokyoScope==="ku23"?"東京都（23区）":"東京都（全域）";
+  const prefNames=prefs.map(n=>n==="東京都"?tkLabel:n);
+  const scopeLabel=blockSel?`${selB.pref==="東京都"?tkLabel:selB.pref}／${selB.name}`
+    :prefs.length===4?(tokyoScope==="ku23"?"1都3県（東京は23区）":"1都3県 全域"):prefNames.join("・");
 
   const activeN=(prefs.length<4?1:0)+(blockSel?1:0)
-    +(uses.length<Object.keys(USE).length?1:0)+(sts.length<3?1:0)
+    +(uses.length<Object.keys(USE).length?1:0)+(sts.length<3?1:0)+(tokyoScope!=="all"?1:0)
     +((range[0]!==DEFAULT_RANGE[0]||range[1]!==DEFAULT_RANGE[1])?1:0)+(q?1:0);
   const resetAll=()=>{setPrefs(PREFS.map(p=>p.name));setBlockSel(null);setRange(DEFAULT_RANGE);
-    setUses(Object.keys(USE));setSts(["done","wip","plan"]);setQ("");};
+    setUses(Object.keys(USE));setSts(["done","wip","plan"]);setQ("");setTokyoScope("all");};
   const openMapFor=(pref)=>{resetAll();if(pref)setPrefs([pref]);setFilterOpen(false);setNav("map");};
   const goInsight=(t)=>{setInsTab(t);setFilterOpen(false);setNav("insight");};
 
   const NAVS=[["home","概観",IconLayer],["map","地図",IconMap],["insight","データ",IconStock],["list","一覧",IconList]];
   const filterProps={prefs,setPrefs,blockSel,setBlockSel,range,setRange,uses,setUses,
-    sts,setSts,q,setQ,toggle,onReset:resetAll,onClose:()=>setFilterOpen(false)};
+    sts,setSts,q,setQ,toggle,tokyoScope,setTokyoScope,onReset:resetAll,onClose:()=>setFilterOpen(false)};
 
   return (
     <div className="gk">
@@ -129,19 +135,25 @@ export default function App(){
       {nav!=="home"&&(
         <StatusBar nav={nav} insTab={insTab} count={filtered.length} gfa={totalGfa}
           certN={certProjects} scopeLabel={scopeLabel} activeN={activeN}
-          filterOpen={filterOpen} onFilter={()=>setFilterOpen(o=>!o)} onReset={resetAll}/>)}
+          filterOpen={filterOpen} onFilter={()=>setFilterOpen(o=>!o)} onReset={resetAll}
+          guideOpen={guideOpen} onGuide={nav==="map"?()=>setGuideOpen(o=>!o):null}
+          guideLabel={blockSel?"ブロック情報":"読み方"}/>)}
       {nav!=="home"&&filterOpen&&!(nav==="insight"&&(insTab==="stock"||insTab==="pop"))&&
         <FilterPanel {...filterProps}/>}
 
       {nav==="map"&&(
-        <main className="body">
+        <main className={"body"+(guideOpen?"":" solo")}>
           <div className="stage">
             <MapView data={filtered} byBlock={byBlock} sel={sel} setSel={setSel}
-              blockSel={blockSel} setBlockSel={setBlockSel} prefs={prefs} scopeLabel={scopeLabel}/>
+              blockSel={blockSel} setBlockSel={setBlockSel} prefs={prefs} scopeLabel={scopeLabel}
+              tokyoScope={tokyoScope}/>
           </div>
-          <aside className="panel">
-            {selB?<BlockCard b={selB} items={byBlock[selB.id]||[]} setSel={setSel}/>:<Intro/>}
-          </aside>
+          {guideOpen&&(
+            <aside className="panel">
+              <button className="panel-x" onClick={()=>setGuideOpen(false)}>
+                <IconClose width={11} height={11}/>閉じる</button>
+              {selB?<BlockCard b={selB} items={byBlock[selB.id]||[]} setSel={setSel}/>:<Intro/>}
+            </aside>)}
         </main>
       )}
 
@@ -276,7 +288,8 @@ function HomeView({openMapFor,openProject,goInsight,goList}){
 }
 
 /* ---------- ステータスバー ---------- */
-function StatusBar({nav,insTab,count,gfa,certN,scopeLabel,activeN,filterOpen,onFilter,onReset}){
+function StatusBar({nav,insTab,count,gfa,certN,scopeLabel,activeN,filterOpen,onFilter,onReset,
+  guideOpen,onGuide,guideLabel}){
   const filterless=nav==="insight"&&(insTab==="stock"||insTab==="pop");
   const hint=nav==="map"?"バブル＝ブロックの件数。押すとその街区へズームします"
     :nav==="list"?"行を押すと詳細が開きます"
@@ -296,6 +309,8 @@ function StatusBar({nav,insTab,count,gfa,certN,scopeLabel,activeN,filterOpen,onF
       </div>
       {!filterless&&(
         <div className="stbar-r">
+          {onGuide&&<button className={"fbtn"+(guideOpen?" on":"")} onClick={onGuide} aria-expanded={guideOpen}>
+            <IconLayer width={13} height={13}/>{guideLabel}</button>}
           <button className={"fbtn"+(filterOpen?" on":"")} onClick={onFilter} aria-expanded={filterOpen}>
             <IconSearch width={13} height={13}/>絞り込み
             {activeN>0&&<span className="fbadge">{activeN}</span>}
@@ -309,7 +324,7 @@ function StatusBar({nav,insTab,count,gfa,certN,scopeLabel,activeN,filterOpen,onF
 
 /* ---------- 絞り込みパネル（既定では畳まれている） ---------- */
 function FilterPanel({prefs,setPrefs,blockSel,setBlockSel,range,setRange,uses,setUses,
-  sts,setSts,q,setQ,toggle,onReset,onClose}){
+  sts,setSts,q,setQ,toggle,tokyoScope,setTokyoScope,onReset,onClose}){
   return (
     <section className="ctrl fpanel" aria-label="絞り込み">
       <div className="ctrl-row fp-hd">
@@ -324,6 +339,15 @@ function FilterPanel({prefs,setPrefs,blockSel,setBlockSel,range,setRange,uses,se
             onClick={()=>{toggle(prefs,setPrefs,p.name);setBlockSel(null);}}>{p.name}</button>))}
           <button className="chip ghost" onClick={()=>{setPrefs(PREFS.map(p=>p.name));setBlockSel(null);}}>全域に戻す</button>
         </div>
+      </div>
+      <div className="ctrl-row"><Label>東京の範囲</Label>
+        <div className="seg">
+          <button className={tokyoScope==="all"?"on":""}
+            onClick={()=>{setTokyoScope("all");}}>東京都（全域）</button>
+          <button className={tokyoScope==="ku23"?"on":""}
+            onClick={()=>{setTokyoScope("ku23");setBlockSel(b=>b==="T11"?null:b);}}>東京都（23区）</button>
+        </div>
+        <span className="seg-note">23区を選ぶと多摩（立川・八王子・調布）が除外される。オフィスストックの調査対象は23区。</span>
       </div>
       <div className="ctrl-row"><Label>ブロック</Label>
         <div className="chips scroll">
@@ -412,6 +436,50 @@ function PopView({prefs,blockSel}){
           </LineChart>
         </ResponsiveContainer>
       </div>
+      <div className="agebox">
+        <h3 className="age-h">年齢構成の変化</h3>
+        <p className="age-lead">
+          総数の増減だけでは、街に必要な用途は読めない。オフィス需要を支える生産年齢人口と、
+          住宅・医療・生活サービスの需要を規定する高齢人口は、異なる方向へ動く。
+        </p>
+        <div className="tblwrap"><table className="tbl">
+          <thead><tr><th>全国の年齢3区分</th><th className="r">2020年</th><th className="r">構成比</th>
+            <th className="r">2050年</th><th className="r">構成比</th><th className="r">増減</th></tr></thead>
+          <tbody>
+            {AGE_NATION.map((a,i)=>(<tr key={i}>
+              <td className="nm"><span className="ub" style={{color:a.c}}>■</span>{a.seg}</td>
+              <td className="r mono">{fmt(a.y2020)}万人</td>
+              <td className="r mono">{a.p2020}%</td>
+              <td className="r mono">{fmt(a.y2050)}万人</td>
+              <td className="r mono">{a.p2050}%</td>
+              <td className="r mono" style={{color:a.y2050>=a.y2020?"#7FCBB4":"#DE8C67"}}>
+                {a.y2050>=a.y2020?"+":""}{fmt(a.y2050-a.y2020)}万人</td></tr>))}
+          </tbody>
+        </table></div>
+        <p className="note tight">
+          生産年齢人口は30年で1,969万人（−26.2%）減る一方、高齢人口は285万人増える。高齢人口のピークは2043年の3,953万人。
+          出典：<A s={S.mlitData}/>（社人研 令和5年推計に基づく国土交通省データ集）。
+        </p>
+        <div className="tblwrap" style={{marginTop:18}}><table className="tbl">
+          <thead><tr><th>都県別の高齢化率</th><th className="r">直近（2024年）</th><th className="r">2050年</th>
+            <th className="r">上昇幅</th><th className="r">65歳以上人口指数<br/>（2020=100）</th><th>読み方</th></tr></thead>
+          <tbody>
+            {AGE_PREF.map((a,i)=>(<tr key={i}>
+              <td className="nm">{a.pref}</td>
+              <td className="r mono">{a.cur!==null?a.cur+"%":"—"}</td>
+              <td className="r mono" style={{color:a.y2050!==null?"#E0B25C":"var(--mu)"}}>
+                {a.y2050!==null?a.y2050+"%":"—"}</td>
+              <td className="r mono">{a.cur!==null&&a.y2050!==null?"+"+(a.y2050-a.cur).toFixed(1)+"pt":"—"}</td>
+              <td className="r mono">{a.idx65!==null?a.idx65:"—"}</td>
+              <td className="dim">{a.note}</td></tr>))}
+          </tbody>
+        </table></div>
+        <p className="note tight">
+          出典：<A s={S.kourei}/>、<A s={S.ipssGaiyo}/>。「—」は出典に個別記載がなく、確認できていない項目。
+          総人口が増える東京でも高齢人口は33%増える点が、住宅・生活サービス系の再開発を後押しする構造になっている。
+        </p>
+      </div>
+
       <div className="reads">
         <Read t="東京都は2040年前後がピーク">
           都全体では2040年に約1,450万人で頂点を打ち、2050年でも2020年比＋2.5%を保つ。ただし増加分は都心区と湾岸に偏り、多摩は2030年代から減少に転じる。
