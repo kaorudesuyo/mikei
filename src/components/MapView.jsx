@@ -17,7 +17,9 @@ function MapView({data,byBlock,sel,setSel,blockSel,setBlockSel,prefs,scopeLabel,
   const [ts,setTs]=useState(1);
   useEffect(()=>{
     const el=wrapRef.current;if(!el)return;
-    const upd=()=>{const w=el.getBoundingClientRect().width;if(w)setTs(clamp(MW/w,1,2.6));};
+    /* 文字・記号の拡大係数。PCでは地図の描画幅がSVG座標系とほぼ等倍になり
+       9〜11px相当まで縮んで読めないため、下限を1.75に引き上げている */
+    const upd=()=>{const w=el.getBoundingClientRect().width;if(w)setTs(clamp(MW/w*1.15,1.75,3.0));};
     upd();window.addEventListener("resize",upd);
     return ()=>window.removeEventListener("resize",upd);
   },[]);
@@ -274,8 +276,18 @@ function MapView({data,byBlock,sel,setSel,blockSel,setBlockSel,prefs,scopeLabel,
   const barLen=PX_PER_KM*km*vp.k;
   const kmLabel=km>=1?`${km} km`:`${Math.round(km*1000)} m`;
   const lod=vp.k<1.65?"blocks":"pins";       /* 広域はブロック集計、拡大で個別ピン */
-  const showLabels=vp.k>=2.3;
-  const msf=Math.min(ts,2.2);                 /* 半径・タップ領域のモバイル拡大係数 */
+  const showLabels=vp.k>=2.9;
+  const msf=Math.min(ts,2.2);                 /* 半径・タップ領域の拡大係数 */
+  /* ラベル衝突判定。1描画パスごとにリセットし、確保済み矩形と重なるものは省く */
+  const labelBoxes=useRef([]);
+  const claimLabel=(x,y,text,fs)=>{
+    const w=text.length*fs*1.02, h=fs*1.5;
+    const box=[x-4,y-h,x+w+4,y+4];
+    for(const b of labelBoxes.current){
+      if(box[0]<b[2]&&box[2]>b[0]&&box[1]<b[3]&&box[3]>b[1])return false;
+    }
+    labelBoxes.current.push(box);return true;
+  };
   const popColor=(b)=>{const i=popIdx50(b);return i>=105?"#7FCBB4":i<=95?"#DE8C67":"#8B8A82";};
 
   return (
@@ -330,37 +342,39 @@ function MapView({data,byBlock,sel,setSel,blockSel,setBlockSel,prefs,scopeLabel,
             <path d={basePaths.coast} className="coast" vectorEffect="non-scaling-stroke"/>
           </g>
 
-          {vp.k<2.4&&GEO_LABELS.map((g,i)=>(
+          {vp.k<2.7&&GEO_LABELS.map((g,i)=>(
             <text key={"geo"+i} x={X(g.ll[0])} y={Y(g.ll[1])} className={"geo-l"+(g.sea?" sea":"")}>{g.t}</text>))}
 
           {/* 市区町村名：都県名（×2.4未満）と入れ替わる形で表示 */}
-          {vp.k>=2.4&&basePaths.muni.map((m,i)=>{
+          {vp.k>=2.7&&basePaths.muni.map((m,i)=>{
             const x=(m.lx-vp.cx)*vp.k+MW/2, y=(m.ly-vp.cy)*vp.k+MH/2;
             if(x<-70||x>MW+70||y<-30||y>MH+30)return null;
             return <text key={"mul"+i} x={x} y={y} className="muni-l">{m.n}</text>;
           })}
 
           {/* 地下鉄の路線名 */}
-          {vp.k>=2.6&&basePaths.metros.map((r,i)=>{
+          {vp.k>=3.1&&basePaths.metros.map((r,i)=>{
             const x=(r.lx-vp.cx)*vp.k+MW/2, y=(r.ly-vp.cy)*vp.k+MH/2;
             if(x<-60||x>MW+60||y<-30||y>MH+30)return null;
             return <text key={"mtl"+i} x={x} y={y+11} className="rail-l metro-l" fill={r.c}>{r.n}</text>;
           })}
 
           {/* 路線名：中ズーム以上で控えめに */}
-          {vp.k>=2.0&&basePaths.rails.map((r,i)=>{
+          {vp.k>=2.5&&basePaths.rails.map((r,i)=>{
             const x=(r.lx-vp.cx)*vp.k+MW/2, y=(r.ly-vp.cy)*vp.k+MH/2;
             if(x<-60||x>MW+60||y<-30||y>MH+30)return null;
             return <text key={"rl"+i} x={x} y={y-6} className="rail-l" fill={r.c}>{r.n}</text>;
           })}
 
           {/* 駅：主要駅は中ズームから、その他は拡大時に表示 */}
-          {vp.k>=1.9&&STATIONS.filter(st=>st.mj||vp.k>=3.2).map((st,i)=>{
+          {vp.k>=2.3&&STATIONS.filter(st=>st.mj||vp.k>=4.0).map((st,i)=>{
             const x=X(st.ll[0]),y=Y(st.ll[1]);
             if(x<-40||x>MW+40||y<-24||y>MH+24)return null;
+            const lx=x+5*Math.min(ts,1.8), ly=y+3.4;
+            const okL=claimLabel(lx,ly,st.n,9*ts);
             return (<g key={"st"+i} className="stn">
               <circle cx={x} cy={y} r={2.6*Math.min(ts,1.8)} className="stn-d"/>
-              <text x={x+5*Math.min(ts,1.8)} y={y+3.4} className="stn-l">{st.n}</text></g>);
+              {okL&&<text x={lx} y={ly} className="stn-l">{st.n}</text>}</g>);
           })}
 
           {/* 人口レイヤー：円の大きさ=代表市区の2020年人口、色=2050年指数 */}
@@ -388,9 +402,17 @@ function MapView({data,byBlock,sel,setSel,blockSel,setBlockSel,prefs,scopeLabel,
               <text x={X(b.ll[0])} y={Y(b.ll[1])+r+17} className="blk-l">{b.short}</text></g>);
           })}
 
+          {/* 案件名ラベルの重なり回避：画面座標で矩形を確保し、衝突するラベルは描かない。
+              選択中のピンは常に最優先で確保する */}
+          {(()=>{labelBoxes.current=[];return null;})()}
+
           {/* 個別ピン（拡大LOD）。中間ズームではブロック名を薄く残し現在地の手掛かりにする */}
           {layers.pins&&lod==="pins"&&vp.k<2.8&&BLOCKS.filter(b=>prefs.includes(b.pref)).map(b=>(
             <text key={"anch"+b.id} x={X(b.ll[0])} y={Y(b.ll[1])-34} className="blk-anchor">{b.short}</text>))}
+          {(()=>{if(sel){const sp=data.find(x=>x.id===sel);
+            if(sp){const sx=X(sp.ll[0]),sy=Y(sp.ll[1]),st2=tick(sp.h);
+              claimLabel(sx+8*msf,sy-st2-6,sp.n,11*ts);}}
+            return null;})()}
           {layers.pins&&lod==="pins"&&data.map(p=>{
             const x=X(p.ll[0]),y=Y(p.ll[1]);
             if(x<-40||x>MW+40||y<-60||y>MH+40)return null;
@@ -404,7 +426,8 @@ function MapView({data,byBlock,sel,setSel,blockSel,setBlockSel,prefs,scopeLabel,
               <circle cx={x} cy={y} r={r*msf} fill={c} className="base"/>
               <circle cx={x} cy={y-t/2} r={12*msf} fill="transparent"/>
               {on&&<circle cx={x} cy={y} r={r+8} className="ring pulse"/>}
-              {(showLabels||on)&&<text x={x+8} y={y-t-6} className={"pin-l"+(on?" on":"")}>{p.n}</text>}
+              {(on||(showLabels&&claimLabel(x+8*msf,y-t-6,p.n,10*ts)))&&
+                <text x={x+8*msf} y={y-t-6} className={"pin-l"+(on?" on":"")}>{p.n}</text>}
             </g>);
           })}
           </g>
@@ -449,7 +472,7 @@ function MapView({data,byBlock,sel,setSel,blockSel,setBlockSel,prefs,scopeLabel,
             棒の高さ=建物高さ／根元の円=延床面積／破線=計画中／先端の白点=環境認証あり。
             1本指のドラッグで移動、2本指のピンチまたはホイールで拡縮、ダブルタップ・ダブルクリックで拡大。広域表示ではブロック集計、拡大すると個別ピンに切り替わる。
             鉄道は枕木状の破線（JR・私鉄）と単色の細実線（地下鉄・新交通）で描き分け、市区町村界は細かい点線で示す。
-            主要駅は×1.9、路線名は×2.0、市区町村名は×2.4、地下鉄名は×2.6、全駅名は×3.2以上で表示。最大×50まで拡大できる。
+            主要駅は×2.3、路線名は×2.5、市区町村名は×2.7、地下鉄名は×3.1、全駅名は×4.0以上で表示。最大×50まで拡大できる。
             行政界と路線は位置関係を掴むための模式表現で、実測の線形・境界ではない。縮尺は右下に表示。
           </div>
         </>}

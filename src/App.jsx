@@ -200,13 +200,20 @@ export default function App(){
 
 /* ---------- 概観（ホーム） ---------- */
 function HomeView({openMapFor,openProject,goInsight,goList}){
+  /* 数値はすべてデータから算出する。データを更新すれば概観も自動で追随する */
   const totGfa=P.reduce((s,p)=>s+(p.gfa||0),0);
   const certN=P.filter(hasAnyCert).length;
+  const hqN=BLOCKS.reduce((n,b)=>n+hqOf(b.id).list.length,0);
+  const doneN=P.filter(p=>p.st==="done").length;
+  const wipN=P.filter(p=>p.st==="wip").length;
+  const planN=P.filter(p=>p.st==="plan").length;
   const hot=[...P].sort((a,b)=>(b.gfa||0)-(a.gfa||0)).slice(0,5);
   const prefAgg=PREFS.map(pr=>{
     const items=P.filter(p=>blockOf(p.blk).pref===pr.name);
-    return {name:pr.name,n:items.length,
+    const ku=pr.name==="東京都"?items.filter(p=>blockOf(p.blk).ku23).length:null;
+    return {name:pr.name,n:items.length,ku,
       gfa:items.reduce((s,p)=>s+(p.gfa||0),0),
+      hq:BLOCKS.filter(b=>b.pref===pr.name).reduce((n,b)=>n+hqOf(b.id).list.length,0),
       idx:+(pr.pop[6]/pr.pop[0]*100).toFixed(1),
       top:[...items].sort((a,b)=>(b.gfa||0)-(a.gfa||0)).slice(0,2)};
   });
@@ -220,15 +227,20 @@ function HomeView({openMapFor,openProject,goInsight,goList}){
           首都圏の再開発を巨視し、街がどう変わっていくかを時系列で追うための地図。
           東京・神奈川・埼玉・千葉で2020年から2050年にかけて動く主要な再開発 {P.length} 件を、
           事業者の公式リリースと専門メディアの突き合わせで収録。収録対象は、オフィス（事務所）または
-          集合住宅を用途に含む再開発に限定しています。既存オフィスストック・環境認証・
+          集合住宅を用途に含む再開発に限定しています。既存オフィスストック・環境認証・本社集積・
           将来人口とあわせて、街の変化を「全体像」から「1案件の体制」まで掘り下げられます。
         </p>
         <div className="hero-kpis">
           <Stat k="収録案件" v={P.length} u="件"/>
           <Stat k="延床面積 合計" v={Math.round(totGfa/10000).toLocaleString()} u="万㎡"/>
           <Stat k="環境認証あり" v={certN} u="件"/>
+          <Stat k="本社（5,000億円超）" v={hqN} u="社"/>
           <Stat k="エリアブロック" v={BLOCKS.length} u="区分"/>
         </div>
+        <p className="hero-st">
+          竣工済 {doneN}件　／　工事中 {wipN}件　／　計画・準備中 {planN}件　　
+          <span className="dim">最終更新 2026年7月</span>
+        </p>
         <div className="hero-cta">
           <button className="cta main" onClick={()=>openMapFor(null)}><IconMap width={15} height={15}/>地図から始める</button>
           <button className="cta" onClick={goList}><IconList width={14} height={14}/>一覧で探す</button>
@@ -244,8 +256,13 @@ function HomeView({openMapFor,openProject,goInsight,goList}){
           <p>バブルを押す（または「絞り込み」でブロックを選ぶ）と、その街区へ自動でズームし、個別のピンに切り替わります。</p></div>
         <div className="step"><span className="step-n">3</span>
           <b>案件を掘り下げる</b>
-          <p>ピンを押すと詳細パネルが開き、事業主体・設計・施工・環境認証・出典まで確認できます。</p></div>
+          <p>ピンを押すと画面中央に詳細が開き、事業主体・設計・施工・環境認証・出典まで確認できます。</p></div>
       </section>
+      <p className="steps-note">
+        地図には鉄道16路線・地下鉄16路線・駅104か所と市区町村界も重ねています（拡大すると順に現れます）。
+        操作は1本指のドラッグで移動、2本指のピンチで拡縮、最大50倍まで。
+        画面右上の「読み方」を押せば凡例と使い方、ブロック選択中はその街の解説が開きます。
+      </p>
 
       <h2 className="home-h">都県から入る</h2>
       <div className="prefcards">
@@ -257,7 +274,9 @@ function HomeView({openMapFor,openProject,goInsight,goList}){
             <div className="pc-kv">
               <span>{a.n}<i>案件</i></span>
               <span>{Math.round(a.gfa/10000).toLocaleString()}<i>万㎡</i></span>
+              <span>{a.hq}<i>本社</i></span>
             </div>
+            {a.ku!==null&&<div className="pc-sub">うち23区 {a.ku}件／多摩 {a.n-a.ku}件</div>}
             <div className="pc-top">{a.top.map(p=><span key={p.id}>{p.n.split("（")[0]}</span>)}</div>
             <div className="pc-go">地図で見る →</div>
           </button>))}
@@ -280,9 +299,10 @@ function HomeView({openMapFor,openProject,goInsight,goList}){
       <h2 className="home-h">データで深掘りする</h2>
       <div className="golinks">
         <button onClick={()=>goInsight("timeline")}><IconTime width={14} height={14}/>竣工年表<span>供給の山を年別・都県別に</span></button>
-        <button onClick={()=>goInsight("stock")}><IconStock width={14} height={14}/>既存ストック<span>23区1,323万坪＋横浜等の市況</span></button>
+        <button onClick={()=>goInsight("stock")}><IconStock width={14} height={14}/>既存ストック<span>23区1,323万坪と横浜・さいたまの市況</span></button>
+        <button onClick={()=>goInsight("hq")}><IconBldg width={14} height={14}/>本社集積<span>時価総額5,000億円超の{hqN}社をブロック別に</span></button>
         <button onClick={()=>goInsight("cert")}><IconCert width={14} height={14}/>環境認証<span>棟単位と街区一括を区別して集計</span></button>
-        <button onClick={()=>goInsight("pop")}><IconPop width={14} height={14}/>人口動態<span>2050年までの将来推計</span></button>
+        <button onClick={()=>goInsight("pop")}><IconPop width={14} height={14}/>人口動態<span>2050年までの将来推計と年齢構成</span></button>
       </div>
     </div>
   );

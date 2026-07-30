@@ -308,7 +308,10 @@
 .hero{padding:56px 0 40px;border-bottom:1px solid var(--line)}
 .hero-t{font-family:var(--mincho);font-weight:400;font-size:37px;line-height:1.55;letter-spacing:.06em;margin:0 0 20px;color:var(--tx)}
 .hero-p{font-size:13.5px;line-height:2.15;color:var(--tx2);max-width:640px;margin:0 0 30px}
-.hero-kpis{display:flex;gap:38px;flex-wrap:wrap;margin-bottom:32px}
+.hero-kpis{display:flex;gap:34px;flex-wrap:wrap;margin-bottom:16px}
+.hero-st{font-size:12px;color:var(--tx2);letter-spacing:.04em;margin:0 0 28px}
+.steps-note{font-size:12px;line-height:2;color:var(--mu);margin:16px 0 0;max-width:860px}
+.pc-sub{font-size:10.5px;color:var(--mu);letter-spacing:.04em}
 .hero-cta{display:flex;gap:10px;flex-wrap:wrap}
 .cta{background:#131318;border:1px solid var(--line2);color:var(--tx);font-size:13.5px;padding:12px 22px;letter-spacing:.08em}
 .cta:hover{border-color:#5A5A66}
@@ -459,9 +462,9 @@
 /* ---- v25: 地図の高さ抑制・中央寄せ・パネル開閉 ---- */
 .stage{display:flex;justify-content:center;align-items:stretch}
 .mapwrap{width:100%;max-width:1180px;min-height:0;
-  height:clamp(660px,calc(100vh - 220px),1040px)}
+  height:clamp(790px,calc(100vh - 180px),1250px)}
 .body.solo .mapwrap{max-width:1320px}
-.panel{position:relative;max-height:clamp(660px,calc(100vh - 220px),1040px)}
+.panel{position:relative;max-height:clamp(790px,calc(100vh - 180px),1250px)}
 .panel-x{position:sticky;top:0;float:right;background:#16161B;border:1px solid var(--line2);
   color:var(--tx2);font-size:11px;padding:4px 10px;letter-spacing:.08em;margin:-6px -6px 6px 8px;z-index:2}
 .panel-x:hover{color:var(--tx);border-color:#5A5A66}
@@ -537,7 +540,7 @@
   .sliders{flex:1;width:auto}
   .tabs{margin-left:0;width:100%;overflow-x:auto}
   .tab{flex:1;justify-content:center;padding:9px 8px}
-  .mapwrap{height:clamp(560px,86vh,900px);max-width:none}
+  .mapwrap{height:clamp(670px,92vh,1080px);max-width:none}
   .panel{max-height:none}
   .mapbar{padding:8px 10px;gap:8px}
   .legend{padding:9px 10px}
