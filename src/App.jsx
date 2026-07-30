@@ -3,13 +3,13 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, BarChart, Bar, Legend, ReferenceLine
 } from "recharts";
-import { PREFS, BLOCKS, POP_YEARS, AGE_NATION, AGE_PREF } from "./data/blocks.js";
+import { PREFS, BLOCKS, POP_YEARS, AGE_NATION, AGE_PREF, hqOf } from "./data/blocks.js";
 import { USE, STATUS } from "./data/certSystems.js";
 import { P } from "./data/projects.js";
 import { S } from "./data/sources.js";
 import { AREA_CERTS } from "./data/areaCerts.js";
 import { blockOf, fmt, TT, hasAnyCert } from "./lib/utils.js";
-import { CertGlyph, IconMap, IconTime, IconStock, IconCert, IconList, IconPop, IconSearch, IconLink, IconChevD, IconReset, IconClose, IconLayer, MikeiMark } from "./components/icons.jsx";
+import { CertGlyph, IconMap, IconTime, IconStock, IconCert, IconList, IconPop, IconSearch, IconLink, IconChevD, IconReset, IconClose, IconLayer, IconBldg, MikeiMark } from "./components/icons.jsx";
 import { Label, Stat, Read, A } from "./components/ui.jsx";
 import { MapView } from "./components/MapView.jsx";
 import { DetailDrawer } from "./components/DetailDrawer.jsx";
@@ -161,13 +161,14 @@ export default function App(){
         <section className="ins">
           <div className="instabs">
             {[["timeline","竣工年表",IconTime],["stock","既存ストック",IconStock],
-              ["cert","環境認証",IconCert],["pop","人口動態",IconPop]].map(([k,l,I])=>(
+              ["hq","本社集積",IconBldg],["cert","環境認証",IconCert],["pop","人口動態",IconPop]].map(([k,l,I])=>(
               <button key={k} className={"instab "+(insTab===k?"on":"")} onClick={()=>{setInsTab(k);setFilterOpen(false);}}>
                 <I width={13} height={13}/>{l}</button>))}
           </div>
           <div className="stage-full">
             {insTab==="timeline"&&<TimelineView data={timeline} range={range}/>}
             {insTab==="stock"&&<StockView/>}
+            {insTab==="hq"&&<HQView setSel={setSel}/>}
             {insTab==="cert"&&<CertView data={filtered} setSel={setSel} visibleAreaCerts={visibleAreaCerts}/>}
             {insTab==="pop"&&<PopView prefs={prefs} blockSel={blockSel}/>}
           </div>
@@ -290,7 +291,7 @@ function HomeView({openMapFor,openProject,goInsight,goList}){
 /* ---------- ステータスバー ---------- */
 function StatusBar({nav,insTab,count,gfa,certN,scopeLabel,activeN,filterOpen,onFilter,onReset,
   guideOpen,onGuide,guideLabel}){
-  const filterless=nav==="insight"&&(insTab==="stock"||insTab==="pop");
+  const filterless=nav==="insight"&&(insTab==="stock"||insTab==="pop"||insTab==="hq");
   const hint=nav==="map"?"バブル＝ブロックの件数。押すとその街区へズームします"
     :nav==="list"?"行を押すと詳細が開きます"
     :insTab==="timeline"?"絞り込みが年表に反映されます"
@@ -385,6 +386,49 @@ function FilterPanel({prefs,setPrefs,blockSel,setBlockSel,range,setRange,uses,se
       </div>
     </section>
   );
+}
+
+/* ---------- 本社集積タブ ---------- */
+function HQView(){
+  const rows=BLOCKS.map(b=>({b,h:hqOf(b.id)}));
+  const total=rows.reduce((s,r)=>s+r.h.list.length,0);
+  const prime=rows.reduce((s,r)=>s+r.h.list.filter(c=>c.mkt==="P").length,0);
+  return (<div className="pad">
+    <div className="v-hd"><h3><IconBldg width={17} height={17}/>ブロック別の本社集積</h3>
+      <span>時価総額5,000億円以上　{total} 社（上場 {prime}／非上場 {total-prime}）</span></div>
+    <p className="note tight" style={{marginTop:0}}>
+      基準時点は2026年4月1日。各ブロックの区域内に本店または実質的な本社機能を置き、時価総額がおおむね
+      5,000億円以上の企業を収録した。非上場でも企業価値が5,000億円以上と評価される企業（東芝、大正製薬HD、富士ソフト）は、
+      買収価額など評価の根拠を併記のうえ収録している。上場親会社の完全子会社は二重計上を避けるため除いた。
+      <b>時価総額は株価により日々変動するため、5,000億〜7,000億円台の企業には「境界」を付し、基準前後で出入りしうることを示している</b>。
+      規模の表記は概算であり、正確な数値は各社の開示および取引所データを参照してほしい。
+    </p>
+    {rows.map(({b,h})=>(
+      <div className="card" key={b.id}>
+        <div className="hq-hd">
+          <div><span className="bid">{b.id}</span>
+            <span className="hq-bn">{b.name}</span>
+            <span className="hq-pref">{b.pref}{b.ku23?"（23区）":""}</span></div>
+          <span className="hq-cnt mono">{h.list.length}<i>社</i></span>
+        </div>
+        <p className="cs-note" style={{margin:"10px 0 12px"}}>{h.note}</p>
+        {h.list.length>0?(
+          <div className="tblwrap"><table className="tbl">
+            <thead><tr><th>企業名</th><th className="r">コード</th><th>区分</th>
+              <th className="r">時価総額（概算）</th><th>所在地・備考</th></tr></thead>
+            <tbody>
+              {h.list.map((c,i)=>(<tr key={i}>
+                <td className="nm">{c.n}</td>
+                <td className="r mono">{c.code}</td>
+                <td>{c.mkt==="P"?<span className="hq-m mP">プライム</span>
+                  :<span className="hq-m mU">非上場</span>}</td>
+                <td className="r mono">{c.cap}{c.bl?<span className="hq-bl">境界</span>:null}</td>
+                <td className="dim">{c.a}{c.kind?<><br/><span className="hq-k">{c.kind}</span></>:null}</td></tr>))}
+            </tbody>
+          </table></div>
+        ):<div className="dim" style={{fontSize:12.5}}>該当なし</div>}
+      </div>))}
+  </div>);
 }
 
 /* ---------- 人口動態タブ ---------- */

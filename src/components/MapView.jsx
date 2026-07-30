@@ -21,7 +21,7 @@ function MapView({data,byBlock,sel,setSel,blockSel,setBlockSel,prefs,scopeLabel,
     upd();window.addEventListener("resize",upd);
     return ()=>window.removeEventListener("resize",upd);
   },[]);
-  const KMAX=40;
+  const KMAX=50;
   /* クライアント座標→SVG座標。preserveAspectRatio(meet)のレターボックス余白を厳密に補正し、
      ズームの中心が指先・カーソル位置からずれないようにする（従来の近似式が感度悪化の主因） */
   const toMap=(cx,cy,rect)=>{
@@ -449,8 +449,8 @@ function MapView({data,byBlock,sel,setSel,blockSel,setBlockSel,prefs,scopeLabel,
             棒の高さ=建物高さ／根元の円=延床面積／破線=計画中／先端の白点=環境認証あり。
             1本指のドラッグで移動、2本指のピンチまたはホイールで拡縮、ダブルタップ・ダブルクリックで拡大。広域表示ではブロック集計、拡大すると個別ピンに切り替わる。
             鉄道は枕木状の破線（JR・私鉄）と単色の細実線（地下鉄・新交通）で描き分け、市区町村界は細かい点線で示す。
-            主要駅は×1.9、路線名は×2.0、市区町村名は×2.4、地下鉄名は×2.6、全駅名は×3.2以上で表示。
-            行政界と路線は位置関係を掴むための模式表現で、実測の線形・境界ではない。右下に縮尺、最大×40まで拡大できる。
+            主要駅は×1.9、路線名は×2.0、市区町村名は×2.4、地下鉄名は×2.6、全駅名は×3.2以上で表示。最大×50まで拡大できる。
+            行政界と路線は位置関係を掴むための模式表現で、実測の線形・境界ではない。縮尺は右下に表示。
           </div>
         </>}
       </div>

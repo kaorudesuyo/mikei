@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, BarChart, Bar, Legend, ReferenceLine
 } from "recharts";
-import { POP_YEARS, STOCK_TYPE } from "../data/blocks.js";
+import { POP_YEARS, STOCK_TYPE, hqOf } from "../data/blocks.js";
 import { fmt, TT, hasAnyCert } from "../lib/utils.js";
 import { Row } from "./ui.jsx";
 
@@ -38,6 +38,19 @@ function BlockCard({b,items,setSel}){
         </ResponsiveContainer>
       </div>
       <div className="mini">2050年 {idx[6]}（実数 {fmt(b.pop[6])} 人）</div>
+    </Row>
+    <Row k="本社（時価総額5,000億円以上）">
+      {(()=>{const h=hqOf(b.id);return (<>
+        <div className="mini2" style={{marginTop:0,marginBottom:h.list.length?10:0}}>{h.note}</div>
+        {h.list.length>0&&<ul className="hqlist">
+          {h.list.map((c,i)=>(<li key={i}>
+            <span className="hq-n">{c.n}</span>
+            {c.code!=="—"&&<span className="hq-c mono">{c.code}</span>}
+            <span className={"hq-m "+(c.mkt==="P"?"mP":"mU")}>{c.mkt==="P"?"P":"非上場"}</span>
+            <span className="hq-cap mono">{c.cap}</span>
+            <span className="hq-a">{c.a}</span></li>))}
+        </ul>}
+      </>);})()}
     </Row>
     <Row k="登録案件">
       <ul className="mini-list">
