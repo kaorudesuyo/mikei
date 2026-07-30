@@ -1,0 +1,26 @@
+{
+  "name": "mikei-map",
+  "private": true,
+  "version": "1.0.0",
+  "description": "未景 MIKEI — 首都圏 再開発マップ 2020–2050",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint src",
+    "audit": "npm audit --omit=dev"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "recharts": "2.15.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "4.3.1",
+    "vite": "5.4.21",
+    "eslint": "9.39.2",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "16.5.0"
+  }
+}
