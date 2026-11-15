@@ -1,0 +1,25 @@
+{
+  "name": "mikei",
+  "private": true,
+  "version": "5.1.0",
+  "description": "未景 MIKEI — 首都圏 再開発を時間で読む地図",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "artifact": "vite build && node tools/make_artifact.mjs",
+    "preview": "vite preview",
+    "data": "python3 tools/build_data.py",
+    "audit": "npm audit --omit=dev",
+    "pentest": "node tools/pentest.mjs"
+  },
+  "dependencies": {
+    "maplibre-gl": "6.16.0",
+    "react": "19.2.9",
+    "react-dom": "19.2.9"
+  },
+  "devDependencies": {
+    "vite": "7.3.7"
+  },
+  "engines": { "node": ">=20" }
+}

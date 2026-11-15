@@ -1,0 +1,9 @@
+# Netlify の設定（このファイルがあれば、Netlify の画面でビルド設定を入力しなくても動く）
+[build]
+  command = "npm run build && rm -f dist/.htaccess"   # .htaccess は Apache 用。Netlify では不要なので公開物から外す
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"                                 # ビルドに使う Node.js のバージョンを固定（Vite 7 は 20.19 以上が必要）
+
+# セキュリティヘッダーは public/_headers（ビルド後は dist/_headers）で設定している。ここには書かない（二重定義を避けるため）
